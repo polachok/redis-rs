@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Client` struct in crate `redis`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Client">
+
+    <title>redis::Client - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <section class="sidebar">
+        
+        <p class='location'><a href='index.html'>redis</a></p><div class='block struct'><h2>Structs</h2><a class='struct current' href='struct.Client.html'>Client</a><a class='struct ' href='struct.Cmd.html'>Cmd</a><a class='struct ' href='struct.Connection.html'>Connection</a><a class='struct ' href='struct.Error.html'>Error</a><a class='struct ' href='struct.InfoDict.html'>InfoDict</a><a class='struct ' href='struct.Iter.html'>Iter</a><a class='struct ' href='struct.Msg.html'>Msg</a><a class='struct ' href='struct.Parser.html'>Parser</a><a class='struct ' href='struct.Pipeline.html'>Pipeline</a><a class='struct ' href='struct.PubSub.html'>PubSub</a></div><div class='block enum'><h2>Enums</h2><a class='enum ' href='enum.ErrorKind.html'>ErrorKind</a><a class='enum ' href='enum.Value.html'>Value</a></div><div class='block trait'><h2>Traits</h2><a class='trait ' href='trait.FromRedisValue.html'>FromRedisValue</a><a class='trait ' href='trait.ToRedisArgs.html'>ToRedisArgs</a></div><div class='block fn'><h2>Functions</h2><a class='fn ' href='fn.cmd.html'>cmd</a><a class='fn ' href='fn.from_redis_value.html'>from_redis_value</a><a class='fn ' href='fn.pack_command.html'>pack_command</a><a class='fn ' href='fn.parse_redis_value.html'>parse_redis_value</a><a class='fn ' href='fn.pipe.html'>pipe</a></div>
+    </section>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press 'S' to search, '?' for more options..."
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><div class='in-band'>Struct <a href='index.html'>redis</a>::<wbr><a class='struct' href=''>Client</a><wbr><a class='stability Experimental' title=''>Experimental</a></div><div class='out-of-band'><span id='render-detail'>
+            <a id="collapse-all" href="#">[-]
+            </a>&nbsp;<a id="expand-all" href="#">[+]</a>
+        </span><a id='src-869' href='../src/redis/src/redis/client.rs.html#8-12'>[src]</a></div></h1>
+<pre class='rust struct'>pub struct Client {
+    // some fields omitted
+}</pre><div class='docblock'><p>The client type.</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><a class='stability Experimental' title='Experimental'></a><code>impl <a class='struct' href='../redis/struct.Client.html' title='redis::Client'>Client</a></code></h3><div class='docblock'><p>The client acts as connector to the redis server.  By itself it does not
+do much other than providing a convenient way to fetch a connection from
+it.  In the future the plan is to provide a connection pool in the client.</p>
+
+<p>When opening a client a URL in the following format should be used:</p>
+
+<pre><code class="language-plain">redis://host:port/db
+</code></pre>
+
+<p>Example usage::</p>
+<pre class='rust '>
+<span class='kw'>let</span> <span class='ident'>client</span> <span class='op'>=</span> <span class='ident'>redis</span>::<span class='ident'>Client</span>::<span class='ident'>open</span>(<span class='string'>&quot;redis://127.0.0.1/&quot;</span>).<span class='ident'>unwrap</span>();
+<span class='kw'>let</span> <span class='ident'>con</span> <span class='op'>=</span> <span class='ident'>client</span>.<span class='ident'>get_connection</span>().<span class='ident'>unwrap</span>();
+</pre>
+</div><div class='impl-methods'><h4 id='method.open' class='method'><a class='stability Experimental' title='Experimental'></a><code>fn <a href='#method.open' class='fnname'>open</a>(uri: &amp;<a href='http://doc.rust-lang.org/master/std/primitive.str.html'>str</a>) -&gt; <a class='type' href='http://doc.rust-lang.org/master/std/io/type.IoResult.html' title='std::io::IoResult'>IoResult</a>&lt;<a class='struct' href='../redis/struct.Client.html' title='redis::Client'>Client</a>&gt;</code></h4>
+<div class='docblock'><p>Connects to a redis server and returns a client.  This does not
+actually open a connection yet but it does perform some basic
+checks on the URL that might make the operation fail.</p>
+</div><h4 id='method.get_connection' class='method'><a class='stability Experimental' title='Experimental'></a><code>fn <a href='#method.get_connection' class='fnname'>get_connection</a>(&amp;self) -&gt; <a class='type' href='http://doc.rust-lang.org/master/std/io/type.IoResult.html' title='std::io::IoResult'>IoResult</a>&lt;<a class='struct' href='../redis/struct.Connection.html' title='redis::Connection'>Connection</a>&gt;</code></h4>
+<div class='docblock'><p>Instructs the client to actually connect to redis and returns a
+connection object.  The connection object can be used to send
+commands to the server.  This can fail with a variety of errors
+(like unreachable host) so it&#39;s important that you handle those
+errors.</p>
+</div><h4 id='method.get_pubsub' class='method'><a class='stability Experimental' title='Experimental'></a><code>fn <a href='#method.get_pubsub' class='fnname'>get_pubsub</a>(&amp;self) -&gt; <a class='type' href='http://doc.rust-lang.org/master/std/io/type.IoResult.html' title='std::io::IoResult'>IoResult</a>&lt;<a class='struct' href='../redis/struct.PubSub.html' title='redis::PubSub'>PubSub</a>&gt;</code></h4>
+<div class='docblock'><p>Returns a PubSub connection.  A pubsub connection can be used to
+listen to messages coming in through the redis publish/subscribe
+system.</p>
+
+<p>Note that redis&#39; pubsub operates across all databases.</p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <div id="help" class="hidden">
+        <div class="shortcuts">
+            <h1>Keyboard shortcuts</h1>
+            <dl>
+                <dt>?</dt>
+                <dd>Show this help dialog</dd>
+                <dt>S</dt>
+                <dd>Focus the search field</dd>
+                <dt>&larrb;</dt>
+                <dd>Move up in search results</dd>
+                <dt>&rarrb;</dt>
+                <dd>Move down in search results</dd>
+                <dt>&#9166;</dt>
+                <dd>Go to active search result</dd>
+            </dl>
+        </div>
+        <div class="infos">
+            <h1>Search tricks</h1>
+            <p>
+                Prefix searches with a type followed by a colon (e.g.
+                <code>fn:</code>) to restrict the search to a given type.
+            </p>
+            <p>
+                Accepted types are: <code>fn</code>, <code>mod</code>,
+                <code>struct</code>, <code>enum</code>,
+                <code>trait</code>, <code>typedef</code> (or
+                <code>tdef</code>).
+            </p>
+        </div>
+    </div>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "redis";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script async src="../search-index.js"></script>
+</body>
+</html>
