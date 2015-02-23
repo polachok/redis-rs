@@ -1,5 +1,6 @@
 use std::old_io::{Reader, Writer};
 use std::old_io::net::tcp::TcpStream;
+use std::old_io::net::pipe::UnixStream;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::str;
@@ -18,6 +19,7 @@ static DEFAULT_PORT: u16 = 6379;
 fn redis_scheme_type_mapper(scheme: &str) -> url::SchemeType {
     match scheme {
         "redis" => url::SchemeType::Relative(DEFAULT_PORT),
+        "redis+unix" => url::SchemeType::FileLike,
         _ => url::SchemeType::NonRelative,
     }
 }
@@ -30,7 +32,7 @@ pub fn parse_redis_url(input: &str) -> url::ParseResult<url::Url> {
     parser.scheme_type_mapper(redis_scheme_type_mapper);
     match parser.parse(input) {
         Ok(result) => {
-            if result.scheme.as_slice() != "redis" {
+            if result.scheme.as_slice() != "redis" && result.scheme.as_slice() != "redis+unix" {
                 Err(url::ParseError::InvalidScheme)
             } else {
                 Ok(result)
@@ -41,10 +43,19 @@ pub fn parse_redis_url(input: &str) -> url::ParseResult<url::Url> {
 }
 
 
+enum ConnectionInfoInternal {
+	Tcp {
+		host: String,
+		port: u16,
+	},
+	Unix {
+		path: Path,
+	},
+}
+
 /// Holds the connection information that redis should use for connecting.
 pub struct ConnectionInfo {
-    pub host: String,
-    pub port: u16,
+    internal: Box<ConnectionInfoInternal>,
     pub db: i64,
     pub passwd: Option<String>,
 }
@@ -73,27 +84,42 @@ impl<'a> IntoConnectionInfo for &'a str {
 
 impl IntoConnectionInfo for url::Url {
     fn into_connection_info(self) -> RedisResult<ConnectionInfo> {
-        ensure!(self.scheme.as_slice() == "redis",
+        ensure!(self.scheme.as_slice() == "redis" || self.scheme.as_slice() == "redis+unix",
             fail!((InvalidClientConfig, "URL provided is not a redis URL")));
 
-        Ok(ConnectionInfo {
-            host: option_unwrap_or!(self.serialize_host(),
-                fail!((InvalidClientConfig, "Missing hostname"))),
-            port: self.port().unwrap_or(DEFAULT_PORT),
-            db: match self.serialize_path().unwrap_or("".to_string())
-                    .as_slice().trim_matches('/') {
-                "" => 0,
-                path => result_unwrap_or!(path.parse::<i64>(),
-                    fail!((InvalidClientConfig, "Invalid database number"))),
-            },
-            passwd: self.password().and_then(|pw| Some(pw.to_string())),
+	Ok(match(self.serialize_host()) {
+        Some(host) => match host.is_empty() {
+                    true => ConnectionInfo {
+                            internal: Box::new(ConnectionInfoInternal::Unix {
+                            path: result_unwrap_or!(self.to_file_path(),
+                                      fail!((InvalidClientConfig, "Missing path"))),
+                            }),
+                            db: 0,
+                            passwd: self.password().and_then(|pw| Some(pw.to_string())),
+                    },
+                    false => ConnectionInfo {
+                            internal: Box::new(ConnectionInfoInternal::Tcp {
+                                host: host,
+                                port: self.port().unwrap_or(DEFAULT_PORT),
+                            }),
+                            db: match self.serialize_path().unwrap_or("".to_string())
+                                    .as_slice().trim_matches('/') {
+                                        "" => 0,
+                                        path => result_unwrap_or!(path.parse::<i64>(),
+                                        fail!((InvalidClientConfig, "Invalid database number"))),
+                                    },
+                            passwd: self.password().and_then(|pw| Some(pw.to_string())),
+                    },
+        },
+        _ => fail!((InvalidClientConfig, "URL provided is not a redis URL")),
         })
     }
 }
 
 
-struct ActualConnection {
-    sock: TcpStream,
+enum ActualConnection {
+    Tcp(TcpStream),
+    Unix(UnixStream)
 }
 
 /// Represents a stateful redis TCP connection.
@@ -117,28 +143,46 @@ pub struct Msg {
 }
 
 impl ActualConnection {
-
-    pub fn new(host: &str, port: u16) -> RedisResult<ActualConnection> {
+    pub fn new_tcp(host: &str, port: u16) -> RedisResult<ActualConnection> {
         let sock = try!(TcpStream::connect((host, port)));
-        Ok(ActualConnection { sock: sock })
+        Ok(ActualConnection::Tcp(sock))
+    }
+
+    pub fn new_unix(path: &Path) -> RedisResult<ActualConnection> {
+        let sock = try!(UnixStream::connect((path)));
+        Ok(ActualConnection::Unix(sock))
     }
 
     pub fn send_bytes(&mut self, bytes: &[u8]) -> RedisResult<Value> {
-        let w = &mut self.sock as &mut Writer;
+        //let w = &mut self.sock as &mut Writer;
+        let w = match self {
+            &mut ActualConnection::Tcp(ref mut sock) => &mut *sock as &mut Writer,
+            &mut ActualConnection::Unix(ref mut sock) => &mut *sock as &mut Writer,
+        };
         try!(w.write_all(bytes));
         Ok(Value::Okay)
     }
 
     pub fn read_response(&mut self) -> RedisResult<Value> {
-        let mut parser = Parser::new(&mut self.sock as &mut Reader);
+        let mut parser = Parser::new(match self {
+            &mut ActualConnection::Tcp(ref mut sock) => &mut *sock as &mut Reader,
+            &mut ActualConnection::Unix(ref mut sock) => &mut *sock as &mut Reader,
+        });
         parser.parse_value()
     }
 }
 
 
 pub fn connect(connection_info: &ConnectionInfo) -> RedisResult<Connection> {
-    let con = try!(ActualConnection::new(
-        connection_info.host.as_slice(), connection_info.port));
+    let con = try!(match *connection_info.internal {
+        ConnectionInfoInternal::Tcp{ ref host, ref port } => {
+            ActualConnection::new_tcp(host.as_slice(), *port)
+        },
+        ConnectionInfoInternal::Unix{ ref path } => {
+            ActualConnection::new_unix(path)
+        }
+    });
+    
     let rv = Connection { con: RefCell::new(con), db: connection_info.db };
 
     if connection_info.db != 0 {
