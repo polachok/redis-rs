@@ -272,10 +272,10 @@
 
 #![deny(non_camel_case_types)]
 
-#![feature(slicing_syntax)]
 #![feature(core)]
 #![feature(collections)]
-#![feature(io)]
+#![feature(old_io)]
+#![feature(int_uint)]
 
 extern crate url;
 extern crate "rustc-serialize" as serialize;
