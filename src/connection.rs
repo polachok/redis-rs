@@ -149,7 +149,7 @@ impl IntoConnectionInfo for url::Url {
 enum ActualConnection {
     Tcp(BufReader<TcpStream>),
     #[cfg(feature="unix_socket")]
-    Unix(UnixStream),
+    Unix(BufReader<UnixStream>),
 }
 
 /// Represents a stateful redis TCP connection.
@@ -184,7 +184,9 @@ impl ActualConnection {
             }
             #[cfg(feature="unix_socket")]
             ConnectionAddr::Unix(ref path) => {
-                ActualConnection::Unix(try!(UnixStream::connect(path)))
+				let unix = try!(UnixStream::connect(path));
+				let buffered = BufReader::new(unix);
+                ActualConnection::Unix(buffered)
             }
         })
     }
@@ -195,8 +197,8 @@ impl ActualConnection {
                 reader.get_mut() as &mut Write
             }
             #[cfg(feature="unix_socket")]
-            ActualConnection::Unix(ref mut sock) => {
-                &mut *sock as &mut Write
+            ActualConnection::Unix(ref mut reader) => {
+                reader.get_mut() as &mut Write
             }
         };
         try!(w.write(bytes));
@@ -209,8 +211,8 @@ impl ActualConnection {
                 reader as &mut Read
             }
             #[cfg(feature="unix_socket")]
-            ActualConnection::Unix(ref mut sock) => {
-                &mut *sock as &mut Read
+            ActualConnection::Unix(ref mut reader) => {
+                reader as &mut Read
             }
         }).parse_value();
         // shutdown connection on protocol error
@@ -221,8 +223,8 @@ impl ActualConnection {
                         let _ = reader.get_mut().shutdown(net::Shutdown::Both);
                     }
                     #[cfg(feature="unix_socket")]
-                    ActualConnection::Unix(ref mut sock) => {
-                        let _ = sock.shutdown(net::Shutdown::Both);
+                    ActualConnection::Unix(ref mut reader) => {
+                        let _ = reader.get_mut().shutdown(net::Shutdown::Both);
                     }
                 }
             }
